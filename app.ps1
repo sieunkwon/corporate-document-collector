@@ -90,8 +90,6 @@ $form.MinimumSize=[Drawing.Size]::new(820,780)
 $form.StartPosition='CenterScreen'
 $form.Font=[Drawing.Font]::new('Pretendard',10)
 $form.BackColor=$light
-$iconPath=Join-Path $PSScriptRoot 'app_icon.ico'
-if(Test-Path -LiteralPath $iconPath){$form.Icon=[Drawing.Icon]::new($iconPath)}
 
 $root=[Windows.Forms.TableLayoutPanel]::new()
 $root.Dock='Fill'; $root.ColumnCount=1; $root.RowCount=4
