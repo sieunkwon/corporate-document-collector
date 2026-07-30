@@ -450,16 +450,20 @@ class DocumentCollector(tk.Tk):
                     (
                         9,
                         f"참여자({participant}) 증빙묶음",
-                        lambda p: all(
-                            value in compact_text(p.stem)
-                            for value in (
-                                "참여자",
-                                participant_compact,
-                                "통장사본",
-                                "신분증사본",
-                                "주민등록등본",
-                                "길찾기결과",
+                        lambda p: "참여자" in compact_text(p.stem)
+                        and participant_compact in compact_text(p.stem)
+                        and (
+                            "증빙묶음" in compact_text(p.stem)
+                            or sum(
+                                value in compact_text(p.stem)
+                                for value in (
+                                    "통장사본",
+                                    "신분증사본",
+                                    "주민등록등본",
+                                    "길찾기결과",
+                                )
                             )
+                            >= 2
                         ),
                     ),
                     (
@@ -511,7 +515,7 @@ class DocumentCollector(tk.Tk):
                 for order, label, matcher in requirements:
                     company_orders = {1, 2, 4, 11}
                     common_orders = {4, 7}
-                    strict_orders = {1, 2, 11}
+                    strict_orders = {1, 2, 6, 11}
                     pool = company_files if order in company_orders else all_pdfs
                     policy = "common" if order in common_orders else ("strict" if order in strict_orders else "normal")
                     ranked_matches = []
@@ -523,10 +527,10 @@ class DocumentCollector(tk.Tk):
                             ranked_matches.append((score, path.stat().st_mtime, path))
                     ranked_matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
                     matches = [item[2] for item in ranked_matches]
+                    for old_file in participant_folder.glob(f"{order}. *.pdf"):
+                        old_file.unlink()
                     if matches:
                         chosen = matches[0]
-                        for old_file in participant_folder.glob(f"{order}. *.pdf"):
-                            old_file.unlink()
                         target = participant_folder / safe_name(f"{order}. {chosen.name}")
                         shutil.copy2(chosen, target)
                         found_count += 1
