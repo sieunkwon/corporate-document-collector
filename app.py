@@ -25,6 +25,11 @@ def safe_name(name):
     # Windows에서 사용할 수 없는 문자까지 함께 제거해 양쪽 OS에서 같은 결과를 만든다.
     return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip()
 
+def resource_path(name):
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base / name
+
+
 
 def is_month_match(name, month_range):
     digits = re.findall(r"\d+", month_range or "")
@@ -96,6 +101,14 @@ class DocumentCollector(tk.Tk):
         self.minsize(820, 780)
         self.configure(bg="#f5f7fb")
         self.last_result_folder = None
+        self.app_icon = None
+        icon_path = resource_path("app_icon.png")
+        if icon_path.exists():
+            try:
+                self.app_icon = tk.PhotoImage(file=str(icon_path))
+                self.iconphoto(True, self.app_icon)
+            except tk.TclError:
+                pass
 
         desktop = Path.home() / "Desktop"
         if not desktop.exists():

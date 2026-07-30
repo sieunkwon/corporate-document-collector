@@ -31,7 +31,7 @@ Windows 실행 파일 생성:
 
 ```powershell
 python -m pip install pyinstaller
-python -m PyInstaller --clean --noconfirm --onefile --windowed --name "기업서류 PDF 수집기" app.py
+python -m PyInstaller --clean --noconfirm --onefile --windowed --icon "app_icon.ico" --add-data "app_icon.png;." --name "기업서류 PDF 수집기" app.py
 ```
 
 완성된 파일은 `dist/기업서류 PDF 수집기.exe`입니다.
@@ -46,7 +46,7 @@ macOS 앱 생성:
 
 ```bash
 python3 -m pip install pyinstaller
-python3 -m PyInstaller --clean --noconfirm --windowed --name "기업서류 PDF 수집기" app.py
+python3 -m PyInstaller --clean --noconfirm --windowed --icon "app_icon.icns" --add-data "app_icon.png:." --name "기업서류 PDF 수집기" app.py
 ```
 
 완성된 앱은 `dist/기업서류 PDF 수집기.app`입니다. macOS 앱은 macOS에서 빌드해야 합니다.
