@@ -50,14 +50,50 @@ def starts_with_company(compact_name, company_compact):
     return compact_name.startswith(company_compact) or compact_name.startswith(
         "주" + company_compact
     )
+def cohort_numbers(name):
+    return {int(value) for value in re.findall(r"(?<!\d)(\d+)\s*기(?!\d)", normalize_text(name))}
+
+
+def cohort_number(value):
+    match = re.search(r"\d+", value or "")
+    return int(match.group()) if match else None
+
+
+def cohort_score(path, selected_cohort, job, policy, company_compact):
+    selected = cohort_number(selected_cohort)
+    found = cohort_numbers(str(path))
+    if policy == "strict":
+        if selected and selected > 1 and selected not in found:
+            return None
+        if found and selected not in found:
+            return None
+    elif policy == "normal" and found and selected not in found:
+        return None
+
+    if selected in found:
+        score = 300
+    elif not found:
+        score = 100
+    elif policy == "common":
+        score = 20
+    else:
+        return None
+
+    compact_full_path = compact_text(str(path))
+    if company_compact in compact_full_path:
+        score += 1000
+    if job and compact_text(job) in compact_full_path:
+        score += 100
+    return score
+
 
 
 class DocumentCollector(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("기업서류 PDF 자동 수집기")
-        self.geometry("900x790")
-        self.minsize(820, 730)
+        self.geometry("900x840")
+        self.minsize(820, 780)
         self.configure(bg="#f5f7fb")
         self.last_result_folder = None
 
@@ -68,6 +104,8 @@ class DocumentCollector(tk.Tk):
         self.search_var = tk.StringVar(value=str(Path.home()))
         self.output_var = tk.StringVar(value=str(desktop / "기업별_PDF_수집결과"))
         self.company_var = tk.StringVar()
+        self.cohort_var = tk.StringVar(value="1기")
+        self.job_var = tk.StringVar()
         self.round_var = tk.StringVar(value="1차")
         self.month_var = tk.StringVar()
         self.participants_var = tk.StringVar()
@@ -118,11 +156,29 @@ class DocumentCollector(tk.Tk):
         self._folder_row(card, 1, "결과 저장 폴더", self.output_var)
         self._entry_row(card, 2, "기업명", self.company_var)
 
-        ttk.Label(card, text="수집 차수", style="Field.TLabel").grid(
+        ttk.Label(card, text="기수 / 직무", style="Field.TLabel").grid(
             row=3, column=0, sticky="w", pady=9
         )
+        cohort_frame = ttk.Frame(card)
+        cohort_frame.grid(row=3, column=1, columnspan=2, sticky="ew", pady=5)
+        cohort_frame.columnconfigure(1, weight=1)
+        ttk.Combobox(
+            cohort_frame,
+            textvariable=self.cohort_var,
+            values=("1기", "2기", "3기", "4기", "5기"),
+            width=10,
+        ).grid(row=0, column=0, sticky="w", padx=(0, 12))
+        ttk.Entry(cohort_frame, textvariable=self.job_var).grid(
+            row=0, column=1, sticky="ew"
+        )
+        ttk.Label(
+            cohort_frame, text="직무는 선택 입력  예: 마케팅", style="Hint.TLabel"
+        ).grid(row=0, column=2, sticky="w", padx=(12, 0))
+        ttk.Label(card, text="수집 차수", style="Field.TLabel").grid(
+            row=4, column=0, sticky="w", pady=9
+        )
         round_frame = ttk.Frame(card)
-        round_frame.grid(row=3, column=1, columnspan=2, sticky="ew", pady=5)
+        round_frame.grid(row=4, column=1, columnspan=2, sticky="ew", pady=5)
         round_frame.columnconfigure(3, weight=1)
         ttk.Combobox(
             round_frame,
@@ -141,18 +197,18 @@ class DocumentCollector(tk.Tk):
             row=0, column=3, sticky="w"
         )
 
-        self._entry_row(card, 4, "참여자명", self.participants_var)
-        self._entry_row(card, 5, "멘토명", self.mentors_var)
+        self._entry_row(card, 5, "참여자명", self.participants_var)
+        self._entry_row(card, 6, "멘토명", self.mentors_var)
         ttk.Label(
             card,
             text="참여자와 멘토를 같은 순서로 쉼표 구분하세요.  예: 홍길동, 김철수",
             style="Hint.TLabel",
-        ).grid(row=6, column=1, columnspan=2, sticky="w", pady=(2, 10))
+        ).grid(row=7, column=1, columnspan=2, sticky="w", pady=(2, 10))
         ttk.Label(
             card,
             text="월 구간이 일치하는 인턴형 일경험 결과보고만 수집합니다.",
             style="Hint.TLabel",
-        ).grid(row=7, column=1, columnspan=2, sticky="w", pady=(0, 8))
+        ).grid(row=8, column=1, columnspan=2, sticky="w", pady=(0, 8))
 
         actions = tk.Frame(self, bg="#f5f7fb")
         actions.pack(fill="x", pady=(4, 8))
@@ -233,6 +289,8 @@ class DocumentCollector(tk.Tk):
         search_root = Path(self.search_var.get().strip()).expanduser()
         output_text = self.output_var.get().strip()
         company = re.sub(r"^\(주\)", "", normalize_text(self.company_var.get()).strip())
+        cohort = self.cohort_var.get().strip()
+        job = normalize_text(self.job_var.get()).strip()
         month_range = self.month_var.get().strip()
         participants = split_names(self.participants_var.get())
         mentors = split_names(self.mentors_var.get())
@@ -243,6 +301,8 @@ class DocumentCollector(tk.Tk):
             raise ValueError("결과 폴더와 기업명을 입력해 주세요.")
         if not re.search(r"\d+", month_range):
             raise ValueError("월을 7 또는 6-7과 같은 형식으로 입력해 주세요.")
+        if not re.fullmatch(r"\d+\s*기", cohort):
+            raise ValueError("기수를 1기, 2기와 같은 형식으로 입력해 주세요.")
         if not participants or not mentors:
             raise ValueError("참여자명과 멘토명을 입력해 주세요.")
         if len(mentors) != 1 and len(mentors) != len(participants):
@@ -252,6 +312,8 @@ class DocumentCollector(tk.Tk):
             search_root,
             Path(output_text).expanduser(),
             company,
+            cohort,
+            job,
             self.round_var.get(),
             month_range,
             participants,
@@ -264,6 +326,8 @@ class DocumentCollector(tk.Tk):
                 search_root,
                 output_root,
                 company,
+                cohort,
+                job,
                 round_name,
                 month_range,
                 participants,
@@ -295,13 +359,16 @@ class DocumentCollector(tk.Tk):
             company_files = [
                 path
                 for path in all_pdfs
-                if company_compact in compact_text(path.stem)
+                if company_compact in compact_text(str(path))
             ]
 
-            result_folder = output_root / safe_name(f"(주){company}")
+            operation_name = "_".join(value for value in (job, cohort) if value)
+            result_folder = output_root / safe_name(f"(주){company}") / safe_name(operation_name)
             result_folder.mkdir(parents=True, exist_ok=True)
             overall = [
                 f"기업: (주){company}",
+                f"기수: {cohort}",
+                f"직무: {job or '미입력'}",
                 f"차수: {round_name}",
                 f"월 구간: {month_range}",
                 "",
@@ -442,8 +509,20 @@ class DocumentCollector(tk.Tk):
                 missing_labels = []
 
                 for order, label, matcher in requirements:
-                    matches = [path for path in company_files if matcher(path)]
-                    matches.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+                    company_orders = {1, 2, 4, 11}
+                    common_orders = {4, 7}
+                    strict_orders = {1, 2, 11}
+                    pool = company_files if order in company_orders else all_pdfs
+                    policy = "common" if order in common_orders else ("strict" if order in strict_orders else "normal")
+                    ranked_matches = []
+                    for path in pool:
+                        if not matcher(path):
+                            continue
+                        score = cohort_score(path, cohort, job, policy, company_compact)
+                        if score is not None:
+                            ranked_matches.append((score, path.stat().st_mtime, path))
+                    ranked_matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
+                    matches = [item[2] for item in ranked_matches]
                     if matches:
                         chosen = matches[0]
                         for old_file in participant_folder.glob(f"{order}. *.pdf"):
