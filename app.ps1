@@ -30,6 +30,11 @@ function Safe-Name([string]$Name) {
     return $result.Trim()
 }
 
+function Remove-LeadingOrder([string]$Name) {
+    $pattern = '^(?:\s*(?:\[(?:1[0-3]|[1-9])\]|\((?:1[0-3]|[1-9])\)|(?:1[0-3]|[1-9])\s*[.)_-])\s*)+'
+    return [regex]::Replace($Name, $pattern, '')
+}
+
 function Is-MonthMatch([string]$Name, [string]$MonthRange) {
     if ([string]::IsNullOrWhiteSpace($MonthRange)) { return $false }
     $digits = @([regex]::Matches($MonthRange, '\d+') | ForEach-Object { $_.Value })
@@ -247,7 +252,7 @@ $roleFolder=Join-Path $resultFolder(Safe-Name $p);New-Item -ItemType Directory -
 $report=New-Object Collections.Generic.List[string];$missingLabels=New-Object Collections.Generic.List[string];$report.Add("참여자: $p");$report.Add("멘토: $m");$report.Add('');$foundCount=0;$missingCount=0
 foreach($req in($requirements|Sort-Object Order)){
 $companyOrders=@(1,2,4,11);$commonOrders=@(4,7);$strictOrders=@(1,2,6,11);$pool=if($companyOrders-contains$req.Order){$companyFiles}else{$allPdf};$policy=if($commonOrders-contains$req.Order){'common'}elseif($strictOrders-contains$req.Order){'strict'}else{'normal'};$ranked=@($pool|Where-Object{&$req.Matcher $_}|ForEach-Object{$score=Get-CohortScore $_ $cohort $job $policy $companyCompact;if($null-ne$score){[PSCustomObject]@{Score=$score;Modified=$_.LastWriteTime;File=$_}}}|Sort-Object Score,Modified -Descending);$matches=@($ranked|ForEach-Object{$_.File});Get-ChildItem -LiteralPath $roleFolder -File -Filter ("$($req.Order). *.pdf") -ErrorAction SilentlyContinue|Remove-Item -Force
-if($matches.Count-gt 0){$chosen=$matches[0];$targetName=Safe-Name("$($req.Order). "+$chosen.Name);Copy-Item -LiteralPath $chosen.FullName -Destination(Join-Path $roleFolder $targetName)-Force;$foundCount++;$totalFound++;$report.Add("[O] $($req.Order). $($req.Label)");$report.Add("    원본: $($chosen.FullName)")}
+if($matches.Count-gt 0){$chosen=$matches[0];$cleanName=Remove-LeadingOrder $chosen.Name;$targetName=Safe-Name("$($req.Order). "+$cleanName);Copy-Item -LiteralPath $chosen.FullName -Destination(Join-Path $roleFolder $targetName)-Force;$foundCount++;$totalFound++;$report.Add("[O] $($req.Order). $($req.Label)");$report.Add("    원본: $($chosen.FullName)")}
 else{$missingCount++;$totalMissing++;$missingLabels.Add("$($req.Order). $($req.Label)");$report.Add("[X] $($req.Order). $($req.Label)")}
 }
 $report.Add('');$report.Add("수집: $($foundCount)개 / 누락: $($missingCount)개");$overall.Add("[$p / $m] 수집 $($foundCount)개, 누락 $($missingCount)개");if($missingLabels.Count-eq 0){$overall.Add("  누락 없음")}else{foreach($missingLabel in $missingLabels){$overall.Add("  누락: $missingLabel")}};$overall.Add('')

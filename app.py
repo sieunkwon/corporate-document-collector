@@ -25,6 +25,12 @@ def safe_name(name):
     # Windows에서 사용할 수 없는 문자까지 함께 제거해 양쪽 OS에서 같은 결과를 만든다.
     return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip()
 
+def strip_leading_order(name):
+    """이미 붙어 있는 문서 순번(1~13)을 모두 제거한다."""
+    pattern = r"^(?:\s*(?:\[(?:1[0-3]|[1-9])\]|\((?:1[0-3]|[1-9])\)|(?:1[0-3]|[1-9])\s*[.)_-])\s*)+"
+    return re.sub(pattern, "", name)
+
+
 
 def is_month_match(name, month_range):
     digits = re.findall(r"\d+", month_range or "")
@@ -531,7 +537,8 @@ class DocumentCollector(tk.Tk):
                         old_file.unlink()
                     if matches:
                         chosen = matches[0]
-                        target = participant_folder / safe_name(f"{order}. {chosen.name}")
+                        clean_name = strip_leading_order(chosen.name)
+                        target = participant_folder / safe_name(f"{order}. {clean_name}")
                         shutil.copy2(chosen, target)
                         found_count += 1
                         total_found += 1
