@@ -35,6 +35,11 @@ function Remove-LeadingOrder([string]$Name) {
     return [regex]::Replace($Name, $pattern, '')
 }
 
+function Test-CollectionRound([string]$CompactName, [string]$Round) {
+    if ($Round -eq '2차') { return $CompactName -match '2(?:회)?차' }
+    return $CompactName.Contains($Round)
+}
+
 function Is-MonthMatch([string]$Name, [string]$MonthRange) {
     if ([string]::IsNullOrWhiteSpace($MonthRange)) { return $false }
     $digits = @([regex]::Matches($MonthRange, '\d+') | ForEach-Object { $_.Value })
@@ -235,10 +240,10 @@ $pc=Compact-Text $p;$mc=Compact-Text $m
 $requirements=New-Object System.Collections.ArrayList
 [void]$requirements.Add((New-Requirement 'implementation' '인턴형 일경험 실시보고' 1 {param($f)$c=Compact-Text $f.BaseName;(($c.StartsWith($companyCompact))-or($c.StartsWith('주'+$companyCompact)))-and($c-match'인턴형?일경험실시보고')-and-not(Is-MonthMatch $f.BaseName $monthRange)}.GetNewClosure()))
 [void]$requirements.Add((New-Requirement 'monthly' "($monthRange)월 인턴형 일경험 결과보고" 2 {param($f)$c=Compact-Text $f.BaseName;(Is-MonthMatch $f.BaseName $monthRange)-and($c-match'인턴형?일경험결과보고')}))
-[void]$requirements.Add((New-Requirement 'attendance' ("출석부_{0}_{1}"-f$p,$round) 3 {param($f)$c=Compact-Text $f.BaseName;$c.Contains('출석부')-and$c.Contains($pc)-and$c.Contains($round)}.GetNewClosure()))
+[void]$requirements.Add((New-Requirement 'attendance' ("출석부_{0}_{1}"-f$p,$round) 3 {param($f)$c=Compact-Text $f.BaseName;$c.Contains('출석부')-and$c.Contains($pc)-and(Test-CollectionRound $c $round)}.GetNewClosure()))
 [void]$requirements.Add((New-Requirement 'company_bank' '기업통장사본' 4 {param($f)$c=Compact-Text $f.BaseName;$c-match'기업통장사본|국민통장사본'}))
-[void]$requirements.Add((New-Requirement 'interview' "참여자($p) 멘토($m) 면담일지" 5 {param($f)$c=Compact-Text $f.BaseName;$c.Contains('면담일지')-and$c.Contains($pc)-and$c.Contains($mc)-and($round-ne'2차'-or$c.Contains('2차'))}.GetNewClosure()))
-[void]$requirements.Add((New-Requirement 'allowance' "멘토수당 신청서_$m" 6 {param($f)$c=Compact-Text $f.BaseName;$c.Contains('멘토수당신청서')-and$c.Contains($mc)-and($round-ne'2차'-or$c.Contains('2차'))}.GetNewClosure()))
+[void]$requirements.Add((New-Requirement 'interview' "참여자($p) 멘토($m) 면담일지" 5 {param($f)$c=Compact-Text $f.BaseName;$c.Contains('면담일지')-and$c.Contains($pc)-and$c.Contains($mc)-and($round-ne'2차'-or(Test-CollectionRound $c $round))}.GetNewClosure()))
+[void]$requirements.Add((New-Requirement 'allowance' "멘토수당 신청서_$m" 6 {param($f)$c=Compact-Text $f.BaseName;$c.Contains('멘토수당신청서')-and$c.Contains($mc)-and($round-ne'2차'-or(Test-CollectionRound $c $round))}.GetNewClosure()))
 [void]$requirements.Add((New-Requirement 'mentor_bundle' "멘토($m) 증빙묶음" 7 {param($f)$c=Compact-Text $f.BaseName;$c.Contains('멘토')-and$c.Contains($mc)-and$c.Contains('통장사본')-and$c.Contains('신분증사본')-and$c.Contains('재직증명서')}.GetNewClosure()))
 [void]$requirements.Add((New-Requirement 'contract' "인턴형 프로그램 표준계약서_$p" 8 {param($f)$c=Compact-Text $f.BaseName;$c.Contains('인턴형프로그램표준계약서')-and$c.Contains($pc)}.GetNewClosure()))
 [void]$requirements.Add((New-Requirement 'participant_bundle' "참여자($p) 증빙묶음" 9 {param($f)$c=Compact-Text $f.BaseName;$evidenceCount=@('통장사본','신분증사본','주민등록등본','길찾기결과'|Where-Object{$c.Contains($_)}).Count;$c.Contains('참여자')-and$c.Contains($pc)-and($c.Contains('증빙묶음')-or$evidenceCount-ge 2)}.GetNewClosure()))

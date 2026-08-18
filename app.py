@@ -30,6 +30,12 @@ def strip_leading_order(name):
     pattern = r"^(?:\s*(?:\[(?:1[0-3]|[1-9])\]|\((?:1[0-3]|[1-9])\)|(?:1[0-3]|[1-9])\s*[.)_-])\s*)+"
     return re.sub(pattern, "", name)
 
+def matches_collection_round(compact_name, round_name):
+    """2차와 2회차 표기를 같은 수집 차수로 처리한다."""
+    if round_name == "2차":
+        return re.search(r"2(?:회)?차", compact_name) is not None
+    return round_name in compact_name
+
 
 
 def is_month_match(name, month_range):
@@ -388,7 +394,9 @@ class DocumentCollector(tk.Tk):
                 mentor_compact = compact_text(mentor)
 
                 def needs_second_round(compact_name):
-                    return round_name != "2차" or "2차" in compact_name
+                    return round_name != "2차" or matches_collection_round(
+                        compact_name, round_name
+                    )
 
                 requirements = [
                     (
@@ -409,7 +417,7 @@ class DocumentCollector(tk.Tk):
                         f"출석부_{participant}_{round_name}",
                         lambda p: "출석부" in compact_text(p.stem)
                         and participant_compact in compact_text(p.stem)
-                        and round_name in compact_text(p.stem),
+                        and matches_collection_round(compact_text(p.stem), round_name),
                     ),
                     (
                         4,
